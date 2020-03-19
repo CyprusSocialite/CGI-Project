@@ -5,6 +5,7 @@
 #include <fstream>
 #include "Image.h"
 #include <iostream>
+#include "matrix.h"
 #include <random>
 #include <string>
 #include "Vec3.h"
@@ -97,7 +98,8 @@ public:
 	Vec3 SurfaceNormal(Vec3 dir = { 0,0,0 }) override
 	{
 		if (dir.norm2() == 0) dir = lightPos;
-		return (dir - origin);
+		Vec3 n = dir - origin; n.normalise();
+		return n;
 	};
 };	vector<Sphere*> objects;		//TODO: fix
 
@@ -128,31 +130,13 @@ std::uniform_real_distribution<> dis(0, 1);
 
 Vec3 alignVec(const Vec3 &v, const Vec3 &n)		//Change of baseeeees
 {
-	//
+	Matrix<double> _v(3, 1), _n(3, 3);
 
-	v = Vec3(0, 0, 1);
+	_n.put(0, 0, n.x); _n.put(1, 1, n.y); _n.put(2, 2, n.z); 
+	_n.invert();
+	_n *= _v;
 
-	//	std::cout << "In alignVec, v="<<v << " n="<<n<<std::endl;
-	double 	xz = std::atan(n.z / n.x),		//rotation about y-axis
-		xy = std::atan(n.y / n.x);		//rotation about z-axis
-	std::cout << n.z / n.x << " " << xz << " " << xy << std::endl;
-	Vec3 retval = {
-			v.x * std::cos(xy) * std::cos(xz) + v.y * std::sin(xy) + v.z * std::cos(xy) * std::sin(xz),
-			v.x * std::cos(xz) * std::sin(xy) + v.y * std::cos(xy) + v.z * std::sin(xy) * std::sin(xz),
-			-v.x * std::sin(xz) + v.z*std::cos(xz)
-	};
-	/*
-		Vec3 retval= {
-				v.x * (n.x/n.y) * (n.x/n.z)		+ v.y * (n.y/n.x) 	+ v.z * (n.x/n.y) * (n.z/n.x),
-				v.x * (n.x/n.z) * (n.y/n.x)		+ v.y * (n.x/n.y)	+ v.z * (n.y/n.x) * (n.z/n.x),
-				-v.x * (n.z/n.x) 									+ v.z * (n.x/n.z)
-				};
-	*/
-	std::cout << "retval=" << retval << std::endl;
-	if (dot(retval, n) < 0)
-		throw;
-
-	return retval;
+	return Vec3(_n.get(0, 0), _n.get(1, 0), _n.get(2, 0));
 }
 
 Vec3 randVec()
@@ -189,7 +173,8 @@ Vec3 OutgoingLight(Object* sourceObject, Vec3 destDir, int bounce)		//(9)L_o(x_0
 {
 	if (bounce >= PathTracingBounces) return sourceObject->emit;
 
-	Vec3 objNorm = sourceObject->SurfaceNormal(destDir), srcDir = alignVec(randVec(), objNorm);
+	Vec3	objNorm = sourceObject->SurfaceNormal(destDir), 
+			srcDir = alignVec(randVec(), objNorm);
 
 	return (
 		sourceObject->emit +
