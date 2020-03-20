@@ -19,7 +19,7 @@ using namespace std;
 const int NSamples = 1;
 const int PathTracingBounces = 5;
 const float sceneSize = 10; //X
-const Vec3 cam = { 0, 0, -5 }; //Camera position, z-1 away from the 'screen'
+const Vec3 cam = {0.0, 0.0, -5.0}; //Camera position, z-1 away from the 'screen'
 
 
 /*----Classes----*/
@@ -34,12 +34,12 @@ public:
 	Vec3 lightPos;
 
 	Object(int type,
-		double x = 0.0, double y = 0.0, double z = 0.0,
-		double colr = 1.0, double colg = 1.0, double colb = 1.0,
-		Vec3 L_e = { 0.0, 0.0, 0.0 })
+		Vec3 xyz = {0.0, 0.0, 0.0},
+		Vec3 rgb = {1.0, 1.0, 1.0}, //RGB 0-1
+		Vec3 L_e = {0.0, 0.0, 0.0})
 	{
-		origin = { x, y, z };
-		col = { colr, colg, colb }; 	//RGB 0-1
+		origin = xyz;
+		col = rgb; 	
 		emit = L_e;
 		lightPos = {};
 	};
@@ -60,29 +60,25 @@ class Sphere : public Object
 public:
 	double rad;
 
-	Sphere(double x = 0.0, double y = 0.0, double z = 0.0, double r = 1.0,
-		double colr = 1.0, double colg = 1.0, double colb = 1.0,
-		Vec3 L_e = { 0.0, 0.0, 0.0 }) : Object(0, x, y, z, colr, colg, colb, L_e)
+	Sphere(	Vec3 xyz = {0.0, 0.0, 0.0}, double r = 1.0,
+			Vec3 rgb = {1.0, 1.0, 1.0},
+			Vec3 L_e = {0.0, 0.0, 0.0}) : Object(0, xyz, rgb, L_e)
 	{
 		rad = r;
 	};
 
 	bool Intersect(Vec3 srcPos, Vec3 destDir) override
 	{
-		//std::cout << "In Intersect, srcPos=" << srcPos << ", destDir=" << destDir << std::endl;
 		double	a = destDir.norm2(),
-			b = 2 * dot(destDir, srcPos - origin),
-			c = (srcPos - origin).norm2() - pow(rad, 2.0),
-			det = b * b - 4 * a*c,
-			root1, root2;
-		//std::cout << origin << " " << rad << std::endl;
-		//	std::cout << a << " " <<  b << " " << c << std::endl;
-		//std::cout << det << std::endl;
+				b = 2 * dot(destDir, srcPos - origin),
+				c = (srcPos - origin).norm2() - pow(rad, 2.0),
+				det = b * b - 4 * a*c,
+				root1, root2;
+
 		if (det >= 0)
 		{
 			root1 = (-b + sqrt(det)) / (2 * a);
 			root2 = (-b - sqrt(det)) / (2 * a);
-			//	std::cout << root1 << " " << root2 << std::endl;
 			if (root1 >= 0 && root2 >= 0)	//They will have the same sign but better safe than sorry
 			{
 				lightPos = srcPos + min(root1, root2)*destDir;
@@ -105,14 +101,14 @@ public:
 class Rectangle : public Object
 {
 public:
-	double height, length, width;		// Perhaps better as Vec3?
+	Vec3 dim = {1.0, 1.0, 1.0};
 
-	Rectangle(double x = 0.0, double y = 0.0, double z = 0.0,
-		double h = 1.0, double l = 1.0, double w = 1.0,
-		double colr = 1.0, double colg = 1.0, double colb = 1.0,
-		Vec3 L_e = { 0.0, 0.0, 0.0 }) : Object(1, x, y, z, colr, colg, colb, L_e)
+	Rectangle(	Vec3 xyz = {0.0, 0.0, 0.0},
+				Vec3 hlw = {1.0, 1.0, 1.0},
+				Vec3 rgb = {1.0, 1.0, 1.0},
+				Vec3 L_e = {0.0, 0.0, 0.0}) : Object(1, xyz, rgb, L_e)
 	{
-		height = h; length = l; width = w;
+		dim = hlw;
 	};
 
 	bool Intersect(Vec3 srcPos, Vec3 destDir) override
@@ -143,8 +139,8 @@ Vec3 randVec()
 	double 	z = dis(rnd),
 		phi = 2 * pi * dis(rnd),
 		r = std::sqrt(1.0 - z * z);
-	//	std::cout << "in randvec, r="<<r<< " phi="<<phi<<std::endl;
-	return { r * std::cos(phi), r * std::sin(phi), z };	// Z vs Y???
+
+	return { r * std::cos(phi), r * std::sin(phi), z };
 };
 
 double ProbDist(Vec3 dir)
@@ -185,10 +181,9 @@ Vec3 OutgoingLight(Object* sourceObject, Vec3 destDir, int bounce)		//(9)L_o(x_0
 
 Vec3 IncomingLight(Vec3 destPos, Vec3 srcDir, int bounce)	//(4)L_i(x, w_i)
 {
-	//std::cout << "In IncomingLight, " << destPos << " " << srcDir << " " << bounce << std::endl;
 	Object* srcObj = SourceSurface(destPos, srcDir);
 
-	return (srcObj ? OutgoingLight(srcObj, -srcDir, bounce) : Vec3(0, 0, 0));
+	return (srcObj ? OutgoingLight(srcObj, -srcDir, bounce) : Vec3(0.0, 0.0, 0.0));
 };
 
 Vec3 PixVal(Image &img, double x, double y)		//(6)I_xy
@@ -197,7 +192,6 @@ Vec3 PixVal(Image &img, double x, double y)		//(6)I_xy
 	x *= sceneSize / img.Width(); y *= sceneSize / img.Height();
 	Vec3 d = Vec3(x, y, cam.z + 5) - cam; d.normalise();
 
-	//std::cout << "d=" << d << std::endl;
 	Vec3 PixelValue = { 0, 0, 0 };
 	for (int x = 0; x < NSamples; x++)
 	{
@@ -228,15 +222,15 @@ int main()
 	};*/
 
 	objects.push_back(
-		new Sphere(0.0, 0.0, 5.0, 3.0,
-			0.0, 0.0, 1.0)
-	);
+						new Sphere(	{0.0, 0.0, 5.0}, 3.0,
+									{0.0, 0.0, 1.0})
+					);
 
 	objects.push_back(
-		new Sphere(3.0, 3.0, 3.0, 1.0,
-			1.0, 1.0, 1.0,
-			Vec3(1.0, 1.0, 1.0))
-	);
+						new Sphere(	{3.0, 3.0, 3.0}, 1.0,
+									{1.0, 1.0, 1.0},
+									{1.0, 1.0, 1.0})
+					);
 
 	/*objects.push_back(
 						new Sphere(0.0, 0.0, 5.0, 1.0,
@@ -256,16 +250,12 @@ int main()
 
 					//DEBUG: Object type values are weird
 
-	Image img(101, 101);		//DEBUG: Which way do the axis point?
-
+	Image img(101, 101);
 	for (int y = 0; y <= img.Height() - 1; y++)
 	{
 		for (int x = 0; x <= img.Width() - 1; x++)
-			img(x, y) = PixVal(img, x, y);	//DEBUG: accessing works fine
+			img(x, y) = PixVal(img, x, y);
 	}
-
-	//img(51, 51) = PixVal(img, 51, 51);
-
 	img.Save("output.png");
 
 	cout << "Done";
