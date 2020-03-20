@@ -51,7 +51,7 @@ public:
 
 	virtual bool Intersect(Vec3 sourcePos, Vec3 targetDir) = 0;
 
-	virtual Vec3 SurfaceNormal(Vec3 dir) = 0;
+	virtual Vec3 SurfaceNormal() = 0;
 
 };
 
@@ -69,7 +69,7 @@ public:
 
 	bool Intersect(Vec3 srcPos, Vec3 destDir) override
 	{
-		std::cout << "In Intersect, srcPos=" << srcPos << ", destDir=" << destDir << std::endl;
+		//std::cout << "In Intersect, srcPos=" << srcPos << ", destDir=" << destDir << std::endl;
 		double	a = destDir.norm2(),
 			b = 2 * dot(destDir, srcPos - origin),
 			c = (srcPos - origin).norm2() - pow(rad, 2.0),
@@ -95,10 +95,9 @@ public:
 		};
 	};
 
-	Vec3 SurfaceNormal(Vec3 dir = { 0,0,0 }) override
+	Vec3 SurfaceNormal() override
 	{
-		if (dir.norm2() == 0) dir = lightPos;
-		Vec3 n = dir - origin; n.normalise();
+		Vec3 n = lightPos - origin; n.normalise();
 		return n;
 	};
 };	vector<Sphere*> objects;		//TODO: fix
@@ -132,8 +131,8 @@ Vec3 alignVec(const Vec3 &v, const Vec3 &n)		//Change of baseeeees
 {
 	Matrix<double> _v(3, 1), _n(3, 3);
 
-	_n.put(0, 0, n.x); _n.put(1, 1, n.y); _n.put(2, 2, n.z); 
-	_n.invert();
+	_n.put(0, 0, n.x); _n.put(1, 1, n.y); _n.put(2, 2, n.z); _n.invert();
+	_v.put(0, 0, v.x); _v.put(1, 0, v.y); _v.put(2, 0, v.z);
 	_n *= _v;
 
 	return Vec3(_n.get(0, 0), _n.get(1, 0), _n.get(2, 0));
@@ -173,7 +172,7 @@ Vec3 OutgoingLight(Object* sourceObject, Vec3 destDir, int bounce)		//(9)L_o(x_0
 {
 	if (bounce >= PathTracingBounces) return sourceObject->emit;
 
-	Vec3	objNorm = sourceObject->SurfaceNormal(destDir), 
+	Vec3	objNorm = sourceObject->SurfaceNormal(), 
 			srcDir = alignVec(randVec(), objNorm);
 
 	return (
@@ -186,7 +185,7 @@ Vec3 OutgoingLight(Object* sourceObject, Vec3 destDir, int bounce)		//(9)L_o(x_0
 
 Vec3 IncomingLight(Vec3 destPos, Vec3 srcDir, int bounce)	//(4)L_i(x, w_i)
 {
-	std::cout << "In IncomingLight, " << destPos << " " << srcDir << " " << bounce << std::endl;
+	//std::cout << "In IncomingLight, " << destPos << " " << srcDir << " " << bounce << std::endl;
 	Object* srcObj = SourceSurface(destPos, srcDir);
 
 	return (srcObj ? OutgoingLight(srcObj, -srcDir, bounce) : Vec3(0, 0, 0));
@@ -198,7 +197,7 @@ Vec3 PixVal(Image &img, double x, double y)		//(6)I_xy
 	x *= sceneSize / img.Width(); y *= sceneSize / img.Height();
 	Vec3 d = Vec3(x, y, cam.z + 5) - cam; d.normalise();
 
-	std::cout << "d=" << d << std::endl;
+	//std::cout << "d=" << d << std::endl;
 	Vec3 PixelValue = { 0, 0, 0 };
 	for (int x = 0; x < NSamples; x++)
 	{
@@ -230,6 +229,11 @@ int main()
 
 	objects.push_back(
 		new Sphere(0.0, 0.0, 5.0, 3.0,
+			0.0, 0.0, 1.0)
+	);
+
+	objects.push_back(
+		new Sphere(3.0, 3.0, 3.0, 1.0,
 			1.0, 1.0, 1.0,
 			Vec3(1.0, 1.0, 1.0))
 	);
@@ -253,16 +257,14 @@ int main()
 					//DEBUG: Object type values are weird
 
 	Image img(101, 101);		//DEBUG: Which way do the axis point?
-	/*
-	for (int x = 0; x <= img.Width() - 1; x++)
-	{
-		for (int y = 0; y <= img.Height() - 1; y++)
-		{
-			img(x, y) = PixVal(img, x, y);	//DEBUG: accessing works fine
-		}
-	}*/
 
-	img(51, 51) = PixVal(img, 51, 51);
+	for (int y = 0; y <= img.Height() - 1; y++)
+	{
+		for (int x = 0; x <= img.Width() - 1; x++)
+			img(x, y) = PixVal(img, x, y);	//DEBUG: accessing works fine
+	}
+
+	//img(51, 51) = PixVal(img, 51, 51);
 
 	img.Save("output.png");
 
